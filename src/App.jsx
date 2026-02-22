@@ -130,7 +130,7 @@ function App() {
             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <h2 style={{ fontSize: '1.1rem', fontWeight: '600' }}>
-            {view === 'dashboard' && 'Neural Predictors'}
+            {view === 'dashboard' && 'Predictor'}
             {view === 'admin' && 'System Administration'}
           </h2>
         </header>

@@ -113,7 +113,7 @@ const LoginPage = ({ onLogin }) => {
                         </div>
 
                         <h1 style={{ fontSize: '2.8rem', marginBottom: '8px', fontWeight: '900', letterSpacing: '-1px', background: 'linear-gradient(to right, white, var(--text-dim))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BloxPredict</h1>
-                        <p style={{ color: 'var(--text-dim)', marginBottom: '40px', fontSize: '0.85rem', fontWeight: '500', letterSpacing: '0.5px' }}>NEXT-GEN NEURAL PREDICTION ENGINE</p>
+                        <p style={{ color: 'var(--text-dim)', marginBottom: '40px', fontSize: '0.85rem', fontWeight: '500', letterSpacing: '0.5px' }}>NEXT-GEN PREDICTOR</p>
 
                         <AnimatePresence mode="wait">
                             {authStep === 'login' ? (
@@ -137,7 +137,7 @@ const LoginPage = ({ onLogin }) => {
                                     </div>
                                     {error && <p style={{ color: '#ff5252', fontSize: '0.8rem', marginBottom: '20px', fontWeight: '500' }}>{error}</p>}
                                     <button type="submit" className="btn-primary" style={{ width: '100%', height: '60px', fontSize: '1.2rem', fontWeight: '800' }} disabled={loading}>
-                                        {loading ? 'VERIFYING...' : 'ACCESS ENGINE'} <ArrowRight size={20} style={{ marginLeft: '12px' }} />
+                                        {loading ? 'VERIFYING...' : 'LOGIN'} <ArrowRight size={20} style={{ marginLeft: '12px' }} />
                                     </button>
                                     {freeKeyGenEnabled && (
                                         <motion.button
@@ -236,7 +236,7 @@ const LoginPage = ({ onLogin }) => {
                                         </motion.div>
                                     ))}
                                 </div>
-                                <button onClick={() => setPurchaseStep(2)} className="btn-primary" style={{ width: '100%', height: '55px', fontWeight: '800' }}>PROCEED TO SECURE CHECKOUT</button>
+                                <button onClick={() => setPurchaseStep(2)} className="btn-primary" style={{ width: '100%', height: '55px', fontWeight: '800' }}>CHECKOUT</button>
                             </motion.div>
                         )}
 

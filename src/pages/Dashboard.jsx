@@ -196,7 +196,7 @@ const Dashboard = ({ user }) => {
                                         {confidence && (
                                             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ textAlign: 'right', background: 'rgba(124, 77, 255, 0.1)', padding: '10px 15px', borderRadius: '12px', border: '1px solid rgba(124, 77, 255, 0.2)' }}>
                                                 <div style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '1.4rem', letterSpacing: '1px' }}>{confidence}</div>
-                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>NEURAL CONFIDENCE</div>
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>CONFIDENCE</div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
@@ -255,7 +255,7 @@ const Dashboard = ({ user }) => {
                                         className="btn-primary"
                                         style={{ marginTop: '25px', height: '60px', fontSize: '1.2rem', fontWeight: '900', letterSpacing: '2px', boxShadow: '0 10px 20px rgba(124, 77, 255, 0.3)' }}
                                     >
-                                        INITIALIZE PREDICTION
+                                        {activeTab === 'mines' ? 'PREDICT MINES' : 'PREDICT TOWERS'}
                                     </motion.button>
                                 )}
                             </>
@@ -263,7 +263,7 @@ const Dashboard = ({ user }) => {
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
                                     <button onClick={() => setShowingHistory(false)} className="glass" style={{ padding: '10px', borderRadius: '10px' }}><ChevronLeft size={20} /></button>
-                                    <h2 style={{ fontSize: '1.2rem', fontWeight: '800' }}>NEURAL LOG REPLAY</h2>
+                                    <h2 style={{ fontSize: '1.2rem', fontWeight: '800' }}>GAME HISTORY</h2>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) 1fr', gap: '25px' }}>
                                     <div style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '10px' }} className="custom-scroll">
@@ -302,11 +302,11 @@ const Dashboard = ({ user }) => {
                     <div className="glass" style={{ padding: '25px', marginBottom: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '25px' }}>
                             <Sliders size={16} color="var(--primary)" />
-                            <h4 style={{ fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px' }}>CORE SETTINGS</h4>
+                            <h4 style={{ fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px' }}>GAME SETTINGS</h4>
                         </div>
 
                         <div style={{ marginBottom: '20px' }}>
-                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>VERSION 4.2 ENGINE</label>
+                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>V1.5</label>
                             <div style={{ marginTop: '10px', padding: '15px', background: 'rgba(124, 77, 255, 0.05)', borderRadius: '12px', border: '1px solid rgba(124, 77, 255, 0.1)' }}>
                                 <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: '900', marginBottom: '5px' }}>REFERRAL CODE</div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -367,12 +367,12 @@ const Dashboard = ({ user }) => {
                     </div>
 
                     <button onClick={() => setShowingHistory(true)} className="glass pulsate" style={{ width: '100%', padding: '18px', color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', transition: 'all 0.3s' }}>
-                        <History size={18} /> VIEW NEURAL LOGS
+                        <History size={18} /> VIEW GAME HISTORY
                     </button>
 
                     <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(0,255,157,0.05)', borderRadius: '12px', border: '1px solid rgba(0,255,157,0.1)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff9d', boxShadow: '0 0 10px #00ff9d' }}></div>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#00ff9d' }}>SYSTEM ENGINE ACTIVE</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#00ff9d' }}>API IS ONLINE</span>
                     </div>
                 </aside>
 
