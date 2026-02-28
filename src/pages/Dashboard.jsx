@@ -11,6 +11,7 @@ const Dashboard = ({ user }) => {
     const [history, setHistory] = useState([]);
     const [showingHistory, setShowingHistory] = useState(false);
     const [selectedHistory, setSelectedHistory] = useState(null);
+    const [espScript, setEspScript] = useState('');
 
     // Flow State: 'idle' -> 'showing_prediction' -> 'inputting_outcome'
     const [flowState, setFlowState] = useState('idle');
@@ -49,6 +50,19 @@ const Dashboard = ({ user }) => {
             console.error('Failed to fetch history');
         }
     };
+
+    const fetchEspScript = async () => {
+        try {
+            const res = await api.get('/api/esp-script');
+            setEspScript(res.data.script);
+        } catch (err) {
+            console.error('Failed to fetch ESP script');
+        }
+    };
+
+    useEffect(() => {
+        fetchEspScript();
+    }, []);
 
     const getPrediction = async () => {
         if (!clientSeed || !serverSeedHash) return alert('Input Seeds First (Parameters Tab)');
@@ -172,10 +186,8 @@ const Dashboard = ({ user }) => {
 
     return (
         <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', color: 'white', padding: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '25px' }}>
-
-                {/* Main Engine Area */}
-                <section>
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                <section style={{ width: '100%', maxWidth: '850px' }}>
                     <div className="glass" style={{ padding: '30px', minHeight: '650px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
                         {/* Decorative background elements */}
                         <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(124, 77, 255, 0.05) 0%, transparent 70%)' }}></div>
@@ -185,10 +197,10 @@ const Dashboard = ({ user }) => {
                                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px', zIndex: 1 }}>
                                     <div style={{ display: 'flex', gap: '15px' }}>
                                         <button onClick={() => setActiveTab('mines')} className={`tab-btn ${activeTab === 'mines' ? 'active' : ''}`} style={{ padding: '12px 25px', borderRadius: '12px', border: 'none', background: activeTab === 'mines' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600', transition: 'all 0.3s' }}>
-                                            <LayoutGrid size={18} /> Mines
+                                            <Zap size={18} /> ESP Script
                                         </button>
-                                        <button onClick={() => setActiveTab('towers')} className={`tab-btn ${activeTab === 'towers' ? 'active' : ''}`} style={{ padding: '12px 25px', borderRadius: '12px', border: 'none', background: activeTab === 'towers' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600', transition: 'all 0.3s' }}>
-                                            <Pyramid size={18} /> Towers
+                                        <button onClick={() => setActiveTab('instructions')} className={`tab-btn ${activeTab === 'instructions' ? 'active' : ''}`} style={{ padding: '12px 25px', borderRadius: '12px', border: 'none', background: activeTab === 'instructions' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600', transition: 'all 0.3s' }}>
+                                            <Info size={18} /> Instructions
                                         </button>
                                     </div>
 
@@ -203,51 +215,99 @@ const Dashboard = ({ user }) => {
                                 </header>
 
                                 <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.15)', borderRadius: '25px', border: '1px solid var(--surface-border)', padding: '40px', position: 'relative' }}>
-                                    <AnimatePresence mode="wait">
-                                        {loading ? (
-                                            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ textAlign: 'center' }}>
-                                                <div style={{ position: 'relative', width: '80px', height: '80px', margin: '0 auto' }}>
-                                                    <RefreshCcw className="spinning" size={80} color="var(--primary)" style={{ opacity: 0.2 }} />
-                                                    <BrainCircuit size={40} color="var(--primary)" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                                    {activeTab === 'mines' ? (
+                                        <div style={{ width: '100%', textAlign: 'center' }}>
+                                            <div style={{ marginBottom: '30px' }}>
+                                                <div style={{ width: '80px', height: '80px', borderRadius: '25px', background: 'rgba(124, 77, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                                    <Zap size={40} color="var(--primary)" />
                                                 </div>
-                                                <p style={{ marginTop: '20px', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'bold', letterSpacing: '2px' }}>RUNNING {algorithm.toUpperCase()}...</p>
-                                            </motion.div>
-                                        ) : flowState === 'showing_prediction' ? (
-                                            <motion.div key="prediction" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '25px' }}>
-                                                    <Activity size={16} color="var(--primary)" />
-                                                    <h3 style={{ fontSize: '0.9rem', color: 'white', fontWeight: 'bold', letterSpacing: '1px' }}>OPTIMIZED PATH GENERATED</h3>
-                                                </div>
-
-                                                {renderGrid(prediction)}
-
-                                                <button onClick={() => setFlowState('inputting_outcome')} className="btn-primary" style={{ marginTop: '40px', background: 'var(--secondary)', color: '#000', fontWeight: '800', width: '100%', maxWidth: '300px' }}>
-                                                    CONFIRM & TRAIN AI
-                                                </button>
-                                            </motion.div>
-                                        ) : flowState === 'inputting_outcome' ? (
-                                            <motion.div key="training" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
-                                                    <ShieldAlert size={18} color="#ff5252" />
-                                                    <h3 style={{ fontSize: '0.9rem', color: '#ff5252', fontWeight: 'bold' }}>MARK ACTUAL {activeTab === 'mines' ? 'MINE' : 'ROW'} LOCATIONS</h3>
-                                                </div>
-                                                {renderGrid(actualOutcome, 'input')}
-                                                <div style={{ marginTop: '25px', padding: '15px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', fontSize: '0.75rem', color: 'var(--text-dim)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                    <Info size={14} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                                                    Providing accurate outcomes improves next-round logic
-                                                </div>
-                                                <button onClick={syncOutcome} className="btn-primary" style={{ marginTop: '20px', width: '100%' }}>SYNC TO CORE NEURAL NETWORK</button>
-                                            </motion.div>
-                                        ) : (
-                                            <div style={{ textAlign: 'center', opacity: 0.2 }}>
-                                                <BrainCircuit size={80} />
-                                                <p style={{ marginTop: '15px', fontWeight: 'bold', letterSpacing: '1px' }}>AWAITING SEED DATA</p>
+                                                <h2 style={{ fontSize: '1.8rem', fontWeight: '900', letterSpacing: '1px' }}>ESP USERSCRIPT PREDICTOR</h2>
+                                                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginTop: '10px' }}>Run this script in your browser console or Tampermonkey to enable ESP.</p>
                                             </div>
-                                        )}
-                                    </AnimatePresence>
+
+                                            <div className="glass" style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '15px', position: 'relative', textAlign: 'left', marginBottom: '25px' }}>
+                                                <pre style={{ margin: 0, fontSize: '0.75rem', color: 'var(--primary)', fontFamily: 'monospace', maxHeight: '200px', overflowY: 'auto' }}>
+                                                    {espScript || '// Loading script...'}
+                                                </pre>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(espScript);
+                                                        alert('Script Copied to Clipboard');
+                                                    }}
+                                                    className="btn-primary"
+                                                    style={{ height: '55px' }}
+                                                >
+                                                    COPY SCRIPT
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const blob = new Blob([espScript], { type: 'text/javascript' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = 'blox_esp.js';
+                                                        a.click();
+                                                    }}
+                                                    className="glass"
+                                                    style={{ height: '55px', color: 'white', fontWeight: 'bold' }}
+                                                >
+                                                    DOWNLOAD .JS
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: '100%', textAlign: 'left' }}>
+                                            <h2 style={{ fontSize: '1.5rem', fontWeight: '900', marginBottom: '25px', color: 'var(--primary)' }}>GETTING STARTED</h2>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                                <div className="glass" style={{ padding: '20px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                                        <div style={{ minWidth: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.8rem' }}>1</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '800', fontSize: '1rem', marginBottom: '5px' }}>Install Tampermonkey</div>
+                                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Download the Tampermonkey extension for your browser (Chrome, Edge, or Brave).</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="glass" style={{ padding: '20px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                                        <div style={{ minWidth: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.8rem' }}>2</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '800', fontSize: '1rem', marginBottom: '5px' }}>Copy the ESP Script</div>
+                                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Go to the "ESP Script" tab on this dashboard and click the "COPY SCRIPT" button.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="glass" style={{ padding: '20px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                                        <div style={{ minWidth: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.8rem' }}>3</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '800', fontSize: '1rem', marginBottom: '5px' }}>Create New Script</div>
+                                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Open Tampermonkey &rarr; "Create a new script" &rarr; Paste the code and press CTRL+S to save.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="glass" style={{ padding: '20px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                                        <div style={{ minWidth: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.8rem' }}>4</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '800', fontSize: '1rem', marginBottom: '5px' }}>Sync & Play</div>
+                                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Refresh BloxFlip or BloxGame. The predictor menu will appear at the bottom automatically.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {flowState === 'idle' && !loading && (
+                                {activeTab !== 'mines' && activeTab !== 'instructions' && flowState === 'idle' && !loading && (
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
@@ -255,7 +315,7 @@ const Dashboard = ({ user }) => {
                                         className="btn-primary"
                                         style={{ marginTop: '25px', height: '60px', fontSize: '1.2rem', fontWeight: '900', letterSpacing: '2px', boxShadow: '0 10px 20px rgba(124, 77, 255, 0.3)' }}
                                     >
-                                        {activeTab === 'mines' ? 'PREDICT MINES' : 'PREDICT TOWERS'}
+                                        PREDICT TOWERS
                                     </motion.button>
                                 )}
                             </>
@@ -296,85 +356,6 @@ const Dashboard = ({ user }) => {
                         )}
                     </div>
                 </section>
-
-                {/* Sidebar Parameters */}
-                <aside>
-                    <div className="glass" style={{ padding: '25px', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '25px' }}>
-                            <Sliders size={16} color="var(--primary)" />
-                            <h4 style={{ fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px' }}>GAME SETTINGS</h4>
-                        </div>
-
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>V1.5</label>
-                            <div style={{ marginTop: '10px', padding: '15px', background: 'rgba(124, 77, 255, 0.05)', borderRadius: '12px', border: '1px solid rgba(124, 77, 255, 0.1)' }}>
-                                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: '900', marginBottom: '5px' }}>REFERRAL CODE</div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span style={{ fontSize: '1rem', fontWeight: '900', letterSpacing: '1px' }}>{user?.referralCode}</span>
-                                    <button onClick={() => navigator.clipboard.writeText(user?.referralCode)} className="glass" style={{ padding: '5px 10px', fontSize: '0.6rem', color: 'white', cursor: 'pointer' }}>COPY</button>
-                                </div>
-                                <div style={{ marginTop: '10px', fontSize: '0.7rem', color: 'white', fontWeight: 'bold' }}>
-                                    Referrals: <span style={{ color: 'var(--primary)' }}>{user?.referralCount || 0}</span>
-                                </div>
-                                <p style={{ fontSize: '0.55rem', color: 'var(--text-dim)', marginTop: '8px' }}>Refer 5 friends for 3 days of PREMIUM access.</p>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>NEURAL ALGORITHM</label>
-                            <select value={algorithm} onChange={e => setAlgorithm(e.target.value)} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--surface-border)', color: 'white', borderRadius: '10px', marginTop: '8px', outline: 'none', cursor: 'pointer' }}>
-                                <option value="neural_v4">Neural V4 — 50% Data Weighted</option>
-                                <option value="hash_chain_v1">HashChain V1 — 30% Data Weighted</option>
-                                <option value="quantum_v2">{user?.isPremium || user?.isAdmin ? 'Quantum V2 — 65% Data Weighted (Premium)' : 'Quantum V2 🔒 Premium'}</option>
-                                <option value="dynamic_adapt">{user?.isPremium || user?.isAdmin ? 'Dynamic Adaptive — 80% Data Weighted (Premium)' : 'Dynamic Adaptive 🔒 Premium'}</option>
-                            </select>
-                        </div>
-
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>SERVER SEED HASH</label>
-                            <div style={{ position: 'relative', marginTop: '8px' }}>
-                                <Fingerprint size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.3 }} />
-                                <input className="input-field" style={{ paddingLeft: '40px', fontSize: '0.75rem' }} placeholder="sha256 hash or text..." value={serverSeedHash} onChange={e => setServerSeedHash(e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>CLIENT SEED</label>
-                            <div style={{ position: 'relative', marginTop: '8px' }}>
-                                <Hash size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.3 }} />
-                                <input className="input-field" style={{ paddingLeft: '40px', fontSize: '0.75rem' }} placeholder="Any text..." value={clientSeed} onChange={e => setClientSeed(e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                            <div>
-                                <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>NONCE</label>
-                                <input type="number" className="input-field" style={{ marginTop: '8px', fontSize: '0.8rem' }} value={nonce} onChange={e => setNonce(parseInt(e.target.value) || 0)} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>MINES</label>
-                                <input type="number" className="input-field" style={{ marginTop: '8px', fontSize: '0.8rem' }} value={minesCount} onChange={e => setMinesCount(parseInt(e.target.value) || 1)} />
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                <label style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>SAFE TILES</label>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 'bold' }}>{predictionCount}</span>
-                            </div>
-                            <input type="range" min="1" max="15" value={predictionCount} onChange={e => setPredictionCount(parseInt(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }} />
-                        </div>
-                    </div>
-
-                    <button onClick={() => setShowingHistory(true)} className="glass pulsate" style={{ width: '100%', padding: '18px', color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', transition: 'all 0.3s' }}>
-                        <History size={18} /> VIEW GAME HISTORY
-                    </button>
-
-                    <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(0,255,157,0.05)', borderRadius: '12px', border: '1px solid rgba(0,255,157,0.1)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff9d', boxShadow: '0 0 10px #00ff9d' }}></div>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#00ff9d' }}>API IS ONLINE</span>
-                    </div>
-                </aside>
 
             </div>
         </div>

@@ -159,7 +159,7 @@ export default function AdminPage({ user }) {
     const saveSettings = async () => {
         try {
             await api.post('/api/admin/settings', { settings });
-            alert('System Config Synchronized');
+            alert('Settings Synchronized');
         } catch (err) {
             alert('Sync Failure');
         }
@@ -207,6 +207,9 @@ export default function AdminPage({ user }) {
                             <SidebarButton active={activeTab === 'forge'} onClick={() => setActiveTab('forge')} icon={<Key size={18} />} label="License Forge" />
                             {!isKeyGenOnly && (
                                 <SidebarButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} label="Security Node" />
+                            )}
+                            {!isKeyGenOnly && (
+                                <SidebarButton active={activeTab === 'esp'} onClick={() => setActiveTab('esp')} icon={<Zap size={18} />} label="ESP Script" />
                             )}
                         </nav>
 
@@ -511,6 +514,41 @@ export default function AdminPage({ user }) {
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'esp' && !isKeyGenOnly && (
+                            <motion.div key="esp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                                <div className="glass" style={{ padding: '40px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                                        <div>
+                                            <h3 style={{ fontSize: '1.4rem', fontWeight: '900' }}>ESP Script Master</h3>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '5px' }}>Upload the latest ESP/Script for users to download from their dashboard.</p>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const script = document.getElementById('esp-editor').value;
+                                                try {
+                                                    await api.post('/api/admin/upload-esp', { script });
+                                                    alert('ESP Script Distributed Successfully');
+                                                } catch (err) {
+                                                    alert('Upload Failed');
+                                                }
+                                            }}
+                                            className="btn-primary"
+                                            style={{ height: '50px', padding: '0 30px' }}
+                                        >
+                                            SAVE & DEPLOY
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        id="esp-editor"
+                                        defaultValue={`// BloxPredict ESP Script\n// Update this content for all operators\n\nconsole.log("ESP Initialized");`}
+                                        className="input-field"
+                                        style={{ minHeight: '500px', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6', padding: '25px', resize: 'vertical' }}
+                                        placeholder="// Paste your javascript here..."
+                                    />
                                 </div>
                             </motion.div>
                         )}
