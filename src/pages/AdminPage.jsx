@@ -91,7 +91,7 @@ export default function AdminPage({ user }) {
             } else if (activeTab === 'payments' && !isKeyGenOnly) {
                 const res = await api.get('/api/admin/payments');
                 setPayments(Array.isArray(res.data) ? res.data : []);
-            } else if (activeTab === 'settings' && !isKeyGenOnly) {
+            } else if ((activeTab === 'settings' || activeTab === 'esp') && !isKeyGenOnly) {
                 const res = await api.get('/api/public-settings');
                 if (res.data && typeof res.data === 'object' && Object.keys(res.data).length > 0) {
                     setSettings(prev => ({ ...prev, ...res.data }));
@@ -529,22 +529,27 @@ export default function AdminPage({ user }) {
                                         <button
                                             onClick={async () => {
                                                 const script = document.getElementById('esp-editor').value;
+                                                setLoading(true);
                                                 try {
                                                     await api.post('/api/admin/upload-esp', { script });
+                                                    setSettings(prev => ({ ...prev, esp_script: script }));
                                                     alert('ESP Script Distributed Successfully');
                                                 } catch (err) {
-                                                    alert('Upload Failed');
+                                                    alert(err.response?.status === 413 ? 'Payload Too Large' : 'Upload Failed');
                                                 }
+                                                setLoading(false);
                                             }}
                                             className="btn-primary"
                                             style={{ height: '50px', padding: '0 30px' }}
+                                            disabled={loading}
                                         >
-                                            SAVE & DEPLOY
+                                            {loading ? 'DEPLOYING...' : 'SAVE & DEPLOY'}
                                         </button>
                                     </div>
                                     <textarea
                                         id="esp-editor"
-                                        defaultValue={`// BloxPredict ESP Script\n// Update this content for all operators\n\nconsole.log("ESP Initialized");`}
+                                        key={settings.esp_script ? 'loaded' : 'default'}
+                                        defaultValue={settings.esp_script || `// BloxPredict ESP Script\n// Update this content for all operators\n\nconsole.log("ESP Initialized");`}
                                         className="input-field"
                                         style={{ minHeight: '500px', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6', padding: '25px', resize: 'vertical' }}
                                         placeholder="// Paste your javascript here..."
