@@ -4,13 +4,19 @@ const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000'
 });
 
-// Add interceptor to include token
-api.interceptors.request.use(config => {
-    const token = localStorage.getItem('token');
+// Token is set in-memory only, never persisted to localStorage
+// The App component manages the token in React state and sets it here
+let inMemoryToken = null;
+
+export const setApiToken = (token) => {
+    inMemoryToken = token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        delete api.defaults.headers.common['Authorization'];
     }
-    return config;
-});
+};
+
+export const getApiToken = () => inMemoryToken;
 
 export default api;

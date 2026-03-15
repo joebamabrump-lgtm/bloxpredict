@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import {
     Users, Settings, ShieldCheck, Trash2, Wallet, DollarSign, Key, Plus, Zap,
-    CheckCircle2, XCircle, Search, Clock, Calendar, Mail, Hash, UserCircle
+    CheckCircle2, XCircle, Search, Clock, Calendar, Mail, Hash, UserCircle,
+    Power, AlertTriangle, Crown, Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,18 +26,6 @@ function SidebarButton({ active, onClick, icon, label }) {
     );
 }
 
-function LogEntry({ label, time, detail }) {
-    return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-            <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: '700' }}>{label}</div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '2px' }}>{detail}</div>
-            </div>
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '3px' }}>{time}</div>
-        </div>
-    );
-}
-
 function StatCard({ label, value, icon: Icon, color, delay }) {
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="glass" style={{ padding: '25px', display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -53,7 +42,7 @@ function StatCard({ label, value, icon: Icon, color, delay }) {
 
 // --- MAIN ADMIN ENGINE ---
 
-export default function AdminPage({ user }) {
+export default function AdminPage({ user, onSiteStatusChange }) {
     if (!user) return <div style={{ padding: '100px', textAlign: 'center', color: 'var(--text-dim)' }}>INITIALIZING COMMAND CENTER...</div>;
 
     const isKeyGenOnly = user.adminType === 'keygen';
@@ -64,12 +53,13 @@ export default function AdminPage({ user }) {
     const [payments, setPayments] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
     const [newAnnouncement, setNewAnnouncement] = useState('');
-    const [stats, setStats] = useState({ totalPredictions: 0, totalUsers: 0, totalRevenue: 0 });
+    const [stats, setStats] = useState({ totalPredictions: 0, totalUsers: 0, totalRevenue: 0, premiumUsers: 0, freeUsers: 0 });
     const [loading, setLoading] = useState(false);
 
     // Licensing Protocols
     const [genHours, setGenHours] = useState(24);
     const [genPrefix, setGenPrefix] = useState('BLOX-');
+    const [genUserType, setGenUserType] = useState('premium');
     const [generatedKey, setGeneratedKey] = useState('');
 
     // System Variables
@@ -77,10 +67,15 @@ export default function AdminPage({ user }) {
         pricing_24: { eth: '10', ltc: '10', btc: '12' },
         pricing_168: { eth: '50', ltc: '50', btc: '55' },
         pricing_720: { eth: '150', ltc: '150', btc: '165' },
+        pricing_0: { eth: '500', ltc: '500', btc: '550' },
         wallet_eth: '0x...',
         wallet_ltc: 'L...',
         wallet_btc: '1...',
-        free_keygen_enabled: false
+        free_keygen_enabled: false,
+        site_shutdown: false,
+        esp_shutdown: false,
+        update_mode: false,
+        update_end_time: ''
     });
 
     const fetchData = useCallback(async () => {
@@ -91,7 +86,7 @@ export default function AdminPage({ user }) {
             } else if (activeTab === 'payments' && !isKeyGenOnly) {
                 const res = await api.get('/api/admin/payments');
                 setPayments(Array.isArray(res.data) ? res.data : []);
-            } else if (activeTab === 'settings' && !isKeyGenOnly) {
+            } else if ((activeTab === 'settings' || activeTab === 'esp' || activeTab === 'controls') && !isKeyGenOnly) {
                 const res = await api.get('/api/public-settings');
                 if (res.data && typeof res.data === 'object' && Object.keys(res.data).length > 0) {
                     setSettings(prev => ({ ...prev, ...res.data }));
@@ -119,7 +114,7 @@ export default function AdminPage({ user }) {
     const handleGenerateKey = async () => {
         setLoading(true);
         try {
-            const res = await api.post('/api/admin/generate-key', { hours: genHours, prefix: genPrefix });
+            const res = await api.post('/api/admin/generate-key', { hours: genHours, prefix: genPrefix, userType: genUserType });
             setGeneratedKey(res.data.key);
             fetchData();
         } catch (err) {
@@ -159,7 +154,8 @@ export default function AdminPage({ user }) {
     const saveSettings = async () => {
         try {
             await api.post('/api/admin/settings', { settings });
-            alert('System Config Synchronized');
+            alert('Settings Synchronized');
+            if (onSiteStatusChange) onSiteStatusChange();
         } catch (err) {
             alert('Sync Failure');
         }
@@ -174,13 +170,45 @@ export default function AdminPage({ user }) {
         }
     };
 
+    const toggleUserType = async (userId, currentType) => {
+        const newType = currentType === 'premium' ? 'free' : 'premium';
+        try {
+            await api.post(`/api/admin/users/${userId}/set-type`, { userType: newType });
+            fetchData();
+        } catch (err) {
+            alert('Error updating user type');
+        }
+    };
+
     const approvePayment = async (id) => {
         try {
             const res = await api.post(`/api/admin/payments/${id}/approve`, {});
-            alert('Verified. Key: ' + res.data.key);
+            alert('Verified. Premium Key: ' + res.data.key);
             fetchData();
         } catch (err) {
             alert('Verification Error');
+        }
+    };
+
+    // Quick toggle helpers for controls
+    const quickToggle = async (key, currentVal) => {
+        const newVal = !(currentVal === true || currentVal === 'true');
+        const updated = { ...settings, [key]: newVal };
+        setSettings(updated);
+        try {
+            await api.post('/api/admin/settings', { settings: { [key]: newVal.toString() } });
+            if (onSiteStatusChange) onSiteStatusChange();
+        } catch (err) {
+            alert('Toggle failed');
+        }
+    };
+
+    const setUpdateEndTime = async (endTime) => {
+        setSettings(prev => ({ ...prev, update_end_time: endTime }));
+        try {
+            await api.post('/api/admin/settings', { settings: { update_end_time: endTime } });
+        } catch (err) {
+            alert('Failed to set end time');
         }
     };
 
@@ -200,13 +228,17 @@ export default function AdminPage({ user }) {
                             {!isKeyGenOnly && (
                                 <>
                                     <SidebarButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon={<Users size={18} />} label="Registry" />
-                                    <SidebarButton active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} icon={<Wallet size={18} />} label="Financials" />
+                                    <SidebarButton active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} icon={<Wallet size={18} />} label="Finances" />
                                     <SidebarButton active={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} icon={<Mail size={18} />} label="Broadcasts" />
                                 </>
                             )}
                             <SidebarButton active={activeTab === 'forge'} onClick={() => setActiveTab('forge')} icon={<Key size={18} />} label="License Forge" />
                             {!isKeyGenOnly && (
-                                <SidebarButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} label="Security Node" />
+                                <>
+                                    <SidebarButton active={activeTab === 'controls'} onClick={() => setActiveTab('controls')} icon={<Power size={18} />} label="Site Controls" />
+                                    <SidebarButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} label="Settings" />
+                                    <SidebarButton active={activeTab === 'esp'} onClick={() => setActiveTab('esp')} icon={<Zap size={18} />} label="ESP Script" />
+                                </>
                             )}
                         </nav>
 
@@ -220,14 +252,167 @@ export default function AdminPage({ user }) {
                 {/* Main Control Panel */}
                 <main>
                     {!isKeyGenOnly && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px', marginBottom: '30px' }}>
                             <StatCard label="SYNCS" value={stats.totalPredictions || 0} icon={Zap} color="var(--primary)" delay={0} />
-                            <StatCard label="NODES" value={stats.totalUsers || 0} icon={Users} color="#00ff9d" delay={0.1} />
-                            <StatCard label="CAPITAL" value={`$${(parseFloat(stats.totalRevenue) || 0).toFixed(2)}`} icon={DollarSign} color="var(--secondary)" delay={0.2} />
+                            <StatCard label="TOTAL" value={stats.totalUsers || 0} icon={Users} color="#00ff9d" delay={0.05} />
+                            <StatCard label="PREMIUM" value={stats.premiumUsers || 0} icon={Crown} color="var(--secondary)" delay={0.1} />
+                            <StatCard label="FREE" value={stats.freeUsers || 0} icon={UserCircle} color="var(--text-dim)" delay={0.15} />
+                            <StatCard label="CAPITAL" value={`$${(parseFloat(stats.totalRevenue) || 0).toFixed(2)}`} icon={DollarSign} color="#ffc107" delay={0.2} />
                         </div>
                     )}
 
                     <AnimatePresence mode="wait">
+
+                        {/* ===== SITE CONTROLS TAB ===== */}
+                        {activeTab === 'controls' && !isKeyGenOnly && (
+                            <motion.div key="controls" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
+                                    {/* Shutdown Website */}
+                                    <div className="glass" style={{ padding: '30px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                                            <div style={{ width: '50px', height: '50px', borderRadius: '15px', background: 'rgba(255, 82, 82, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Power size={24} color="#ff5252" />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontWeight: '900', fontSize: '1.1rem' }}>Website Shutdown</h3>
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Completely take the website offline</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            onClick={() => quickToggle('site_shutdown', settings.site_shutdown)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '20px', borderRadius: '15px', cursor: 'pointer',
+                                                background: (settings.site_shutdown === true || settings.site_shutdown === 'true') ? 'rgba(255,82,82,0.1)' : 'rgba(0,255,157,0.05)',
+                                                border: `1px solid ${(settings.site_shutdown === true || settings.site_shutdown === 'true') ? 'rgba(255,82,82,0.3)' : 'rgba(0,255,157,0.2)'}`,
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                        >
+                                            <div>
+                                                <div style={{ fontWeight: '900', fontSize: '1rem', color: (settings.site_shutdown === true || settings.site_shutdown === 'true') ? '#ff5252' : '#00ff9d' }}>
+                                                    {(settings.site_shutdown === true || settings.site_shutdown === 'true') ? '⛔ SITE IS OFFLINE' : '✅ SITE IS ONLINE'}
+                                                </div>
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                                                    {(settings.site_shutdown === true || settings.site_shutdown === 'true') ? 'Users see an offline page' : 'Everything is running normally'}
+                                                </div>
+                                            </div>
+                                            <ToggleSwitch active={settings.site_shutdown === true || settings.site_shutdown === 'true'} color="#ff5252" />
+                                        </div>
+                                    </div>
+
+                                    {/* Shutdown ESP */}
+                                    <div className="glass" style={{ padding: '30px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                                            <div style={{ width: '50px', height: '50px', borderRadius: '15px', background: 'rgba(255, 152, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Zap size={24} color="#ff9800" />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontWeight: '900', fontSize: '1.1rem' }}>ESP Shutdown</h3>
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Disable the ESP userscript</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            onClick={() => quickToggle('esp_shutdown', settings.esp_shutdown)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '20px', borderRadius: '15px', cursor: 'pointer',
+                                                background: (settings.esp_shutdown === true || settings.esp_shutdown === 'true') ? 'rgba(255,152,0,0.1)' : 'rgba(0,255,157,0.05)',
+                                                border: `1px solid ${(settings.esp_shutdown === true || settings.esp_shutdown === 'true') ? 'rgba(255,152,0,0.3)' : 'rgba(0,255,157,0.2)'}`,
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                        >
+                                            <div>
+                                                <div style={{ fontWeight: '900', fontSize: '1rem', color: (settings.esp_shutdown === true || settings.esp_shutdown === 'true') ? '#ff9800' : '#00ff9d' }}>
+                                                    {(settings.esp_shutdown === true || settings.esp_shutdown === 'true') ? '⚠️ ESP IS DISABLED' : '✅ ESP IS ACTIVE'}
+                                                </div>
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                                                    {(settings.esp_shutdown === true || settings.esp_shutdown === 'true') ? 'ESP script returns maintenance message' : 'Premium users can download ESP'}
+                                                </div>
+                                            </div>
+                                            <ToggleSwitch active={settings.esp_shutdown === true || settings.esp_shutdown === 'true'} color="#ff9800" />
+                                        </div>
+                                    </div>
+
+                                    {/* Update Mode - Full Width */}
+                                    <div className="glass" style={{ padding: '30px', gridColumn: '1 / -1' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px' }}>
+                                            <div style={{ width: '50px', height: '50px', borderRadius: '15px', background: 'rgba(124, 77, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Timer size={24} color="var(--primary)" />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontWeight: '900', fontSize: '1.1rem' }}>Update Mode</h3>
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Show a fancy countdown to users. Set end time, enable, and all users see a countdown.</p>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                                            <div>
+                                                <label style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontWeight: 'bold', marginBottom: '8px', display: 'block' }}>UPDATE END TIME</label>
+                                                <input
+                                                    type="datetime-local"
+                                                    className="input-field"
+                                                    value={settings.update_end_time || ''}
+                                                    onChange={e => setSettings(prev => ({ ...prev, update_end_time: e.target.value }))}
+                                                    style={{ colorScheme: 'dark' }}
+                                                />
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                                <button
+                                                    onClick={async () => {
+                                                        await setUpdateEndTime(settings.update_end_time);
+                                                    }}
+                                                    className="glass"
+                                                    style={{ padding: '14px 25px', color: 'var(--primary)', fontWeight: '700', cursor: 'pointer', borderRadius: '12px', width: '100%' }}
+                                                >
+                                                    SET END TIME
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            onClick={() => quickToggle('update_mode', settings.update_mode)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '20px', borderRadius: '15px', cursor: 'pointer',
+                                                background: (settings.update_mode === true || settings.update_mode === 'true') ? 'rgba(124,77,255,0.1)' : 'rgba(0,255,157,0.05)',
+                                                border: `1px solid ${(settings.update_mode === true || settings.update_mode === 'true') ? 'rgba(124,77,255,0.3)' : 'rgba(0,255,157,0.2)'}`,
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                        >
+                                            <div>
+                                                <div style={{ fontWeight: '900', fontSize: '1rem', color: (settings.update_mode === true || settings.update_mode === 'true') ? 'var(--primary)' : '#00ff9d' }}>
+                                                    {(settings.update_mode === true || settings.update_mode === 'true') ? '🔄 UPDATE MODE ACTIVE' : '✅ NORMAL MODE'}
+                                                </div>
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                                                    {(settings.update_mode === true || settings.update_mode === 'true')
+                                                        ? `Users see countdown. End: ${settings.update_end_time || 'No time set'}`
+                                                        : 'Site is in normal operation mode'}
+                                                </div>
+                                            </div>
+                                            <ToggleSwitch active={settings.update_mode === true || settings.update_mode === 'true'} color="var(--primary)" />
+                                        </div>
+
+                                        {(settings.update_mode === true || settings.update_mode === 'true') && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ marginTop: '15px' }}>
+                                                <button
+                                                    onClick={() => quickToggle('update_mode', true)}
+                                                    style={{
+                                                        width: '100%', padding: '14px', borderRadius: '12px',
+                                                        background: 'rgba(255, 82, 82, 0.1)', border: '1px solid rgba(255, 82, 82, 0.3)',
+                                                        color: '#ff5252', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem',
+                                                        fontFamily: 'inherit'
+                                                    }}
+                                                >
+                                                    ⛔ CANCEL UPDATE MODE
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ===== USERS TAB ===== */}
                         {activeTab === 'users' && !isKeyGenOnly && (
                             <motion.div key="users" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                                 <div className="glass" style={{ padding: '0', overflow: 'hidden' }}>
@@ -244,7 +429,10 @@ export default function AdminPage({ user }) {
                                                 <tr style={{ color: 'var(--text-dim)', fontSize: '0.7rem', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                                     <th style={{ padding: '15px' }}>Identity</th>
                                                     <th>License ID</th>
-                                                    <th>Role</th>
+                                                    <th>Type</th>
+                                                    <th>Synced Site</th>
+                                                    <th>Balance</th>
+                                                    <th>Session</th>
                                                     <th>Status</th>
                                                     <th style={{ textAlign: 'right', paddingRight: '25px' }}>Action</th>
                                                 </tr>
@@ -272,7 +460,35 @@ export default function AdminPage({ user }) {
                                                         </td>
                                                         <td style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontWeight: 'bold', fontFamily: 'monospace' }}>{u.key_value}</td>
                                                         <td>
-                                                            {u.is_admin ? <span className="admin-badge">ADMIN</span> : <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>PREMIUM</span>}
+                                                            <span
+                                                                onClick={() => toggleUserType(u.id, u.user_type)}
+                                                                style={{
+                                                                    padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '900', cursor: 'pointer',
+                                                                    background: u.user_type === 'premium' ? 'rgba(0, 229, 255, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                                    color: u.user_type === 'premium' ? 'var(--secondary)' : 'var(--text-dim)',
+                                                                    border: `1px solid ${u.user_type === 'premium' ? 'rgba(0, 229, 255, 0.3)' : 'rgba(255,255,255,0.1)'}`,
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                title="Click to toggle type"
+                                                            >
+                                                                {u.user_type === 'premium' ? '⭐ PREMIUM' : 'FREE'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '800' }}>{u.site_type || 'N/A'}</td>
+                                                        <td style={{ fontSize: '0.85rem', color: '#00ff9d', fontWeight: '900' }}>{u.balance || '0.00'}</td>
+                                                        <td>
+                                                            {u.session ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(u.session);
+                                                                        alert('Cookie Copied!');
+                                                                    }}
+                                                                    className="glass"
+                                                                    style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '0.65rem', color: 'var(--primary)', border: '1px solid var(--primary)', cursor: 'pointer' }}
+                                                                >
+                                                                    COPY
+                                                                </button>
+                                                            ) : <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>None</span>}
                                                         </td>
                                                         <td style={{ fontSize: '0.75rem', color: u.isOnline ? '#00ff9d' : 'var(--text-dim)' }}>{u.isOnline ? 'SYNCED' : 'OFFLINE'}</td>
                                                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
@@ -292,24 +508,30 @@ export default function AdminPage({ user }) {
                             </motion.div>
                         )}
 
+                        {/* ===== PAYMENTS / FINANCES TAB ===== */}
                         {activeTab === 'payments' && !isKeyGenOnly && (
                             <motion.div key="payments" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                                 <div className="glass" style={{ padding: '0', overflow: 'hidden' }}>
                                     <div style={{ padding: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--surface-border)' }}>
-                                        <h3 style={{ fontWeight: '800' }}>Inbound Capital</h3>
-                                        <div style={{ background: 'rgba(0, 229, 255, 0.1)', color: 'var(--secondary)', padding: '6px 15px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                            AWAITING VERIFICATION: {payments.filter(x => x.status === 'pending').length}
+                                        <h3 style={{ fontWeight: '800' }}>Finances — Manual Verification</h3>
+                                        <div style={{ background: 'rgba(255, 193, 7, 0.1)', color: '#ffc107', padding: '6px 15px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                            PENDING: {payments.filter(x => x.status === 'pending').length}
                                         </div>
+                                    </div>
+                                    <div style={{ padding: '15px 20px', background: 'rgba(255,193,7,0.03)', borderBottom: '1px solid rgba(255,193,7,0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <AlertTriangle size={16} color="#ffc107" />
+                                        <span style={{ fontSize: '0.75rem', color: '#ffc107', fontWeight: '600' }}>All payments require your manual approval. Verify the transaction on the blockchain before approving.</span>
                                     </div>
                                     <div style={{ padding: '20px', overflowX: 'auto' }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <thead>
                                                 <tr style={{ color: 'var(--text-dim)', fontSize: '0.7rem', textAlign: 'left', textTransform: 'uppercase' }}>
-                                                    <th style={{ padding: '15px' }}>Date / Operator</th>
+                                                    <th style={{ padding: '15px' }}>Date / Email</th>
+                                                    <th>Plan</th>
                                                     <th>Asset</th>
                                                     <th>Amount</th>
-                                                    <th>Verification ID</th>
-                                                    <th style={{ textAlign: 'right', paddingRight: '25px' }}>Protocol</th>
+                                                    <th>TX Hash</th>
+                                                    <th style={{ textAlign: 'right', paddingRight: '25px' }}>Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -319,12 +541,21 @@ export default function AdminPage({ user }) {
                                                             <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>{getSafeDate(p.created_at)}</div>
                                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '4px' }}>{p.email}</div>
                                                         </td>
+                                                        <td style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                                            {p.duration_hours === 0 ? 'LIFETIME' : p.duration_hours === 168 ? '7 DAYS' : p.duration_hours === 720 ? '30 DAYS' : '24 HOURS'}
+                                                        </td>
                                                         <td style={{ fontWeight: '800', color: 'var(--secondary)' }}>{p.coin?.toUpperCase()}</td>
                                                         <td style={{ fontWeight: '900', fontSize: '1rem' }}>${(parseFloat(p.amount) || 0).toFixed(2)}</td>
                                                         <td>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <Hash size={12} color="var(--text-dim)" />
                                                                 <span style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'monospace' }}>{p.tx_hash?.substring(0, 16)}...</span>
+                                                                <button
+                                                                    onClick={() => navigator.clipboard.writeText(p.tx_hash)}
+                                                                    style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.6rem', fontWeight: '700' }}
+                                                                >
+                                                                    COPY
+                                                                </button>
                                                             </div>
                                                         </td>
                                                         <td style={{ textAlign: 'right', paddingRight: '15px' }}>
@@ -334,7 +565,10 @@ export default function AdminPage({ user }) {
                                                                     <button onClick={() => confirmAction('DENY Transaction?', () => api.post(`/api/admin/payments/${p.id}/reject`).then(fetchData))} style={{ color: '#ff5252', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}>DENY</button>
                                                                 </div>
                                                             ) : (
-                                                                <span style={{ fontSize: '0.7rem', fontWeight: '900', color: p.status === 'approved' ? '#00ff9d' : '#ff5252' }}>{p.status?.toUpperCase()}</span>
+                                                                <div>
+                                                                    <span style={{ fontSize: '0.7rem', fontWeight: '900', color: p.status === 'approved' ? '#00ff9d' : '#ff5252' }}>{p.status?.toUpperCase()}</span>
+                                                                    {p.user_key && <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', marginTop: '4px' }}>Key: {p.user_key}</div>}
+                                                                </div>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -346,6 +580,7 @@ export default function AdminPage({ user }) {
                             </motion.div>
                         )}
 
+                        {/* ===== LICENSE FORGE TAB ===== */}
                         {activeTab === 'forge' && (
                             <motion.div key="forge" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}>
                                 <div className="glass" style={{ padding: '40px', maxWidth: '700px' }}>
@@ -366,11 +601,34 @@ export default function AdminPage({ user }) {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* User Type Selection */}
+                                    <div style={{ marginBottom: '25px' }}>
+                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontWeight: 'bold' }}>USER TYPE</label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                                            <button onClick={() => setGenUserType('premium')} style={{
+                                                padding: '14px', borderRadius: '12px', border: genUserType === 'premium' ? '1px solid var(--secondary)' : '1px solid rgba(255,255,255,0.1)',
+                                                background: genUserType === 'premium' ? 'rgba(0, 229, 255, 0.1)' : 'transparent', color: genUserType === 'premium' ? 'var(--secondary)' : 'var(--text-dim)',
+                                                cursor: 'pointer', fontWeight: '800', fontSize: '0.85rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                            }}>
+                                                <Crown size={16} /> PREMIUM
+                                            </button>
+                                            <button onClick={() => setGenUserType('free')} style={{
+                                                padding: '14px', borderRadius: '12px', border: genUserType === 'free' ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                                                background: genUserType === 'free' ? 'rgba(255,255,255,0.05)' : 'transparent', color: 'var(--text-dim)',
+                                                cursor: 'pointer', fontWeight: '800', fontSize: '0.85rem', fontFamily: 'inherit'
+                                            }}>
+                                                FREE
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <button onClick={handleGenerateKey} className="btn-primary" style={{ width: '100%', height: '60px' }} disabled={loading}>
                                         {loading ? 'FORGING...' : 'GENERATE LICENSE'} <Plus size={20} style={{ marginLeft: '10px' }} />
                                     </button>
                                     {generatedKey && (
                                         <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(0,255,157,0.05)', borderRadius: '15px', border: '1px solid rgba(0,255,157,0.2)', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 'bold', marginBottom: '8px' }}>{genUserType.toUpperCase()} KEY</div>
                                             <div style={{ fontSize: '1.6rem', fontWeight: '900', letterSpacing: '2px', color: '#00ff9d' }}>{generatedKey}</div>
                                             <button onClick={() => navigator.clipboard.writeText(generatedKey)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: 'var(--primary)', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>COPY TO CLIPBOARD</button>
                                         </div>
@@ -379,14 +637,15 @@ export default function AdminPage({ user }) {
                             </motion.div>
                         )}
 
+                        {/* ===== SETTINGS TAB ===== */}
                         {activeTab === 'settings' && !isKeyGenOnly && (
                             <motion.div key="settings" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
                                     <div className="glass" style={{ padding: '30px' }}>
                                         <h3 style={{ marginBottom: '20px', fontWeight: '800' }}>Pricing Nodes (USD)</h3>
-                                        {['24', '168', '720'].map(dur => (
+                                        {['24', '168', '720', '0'].map(dur => (
                                             <div key={dur} style={{ marginBottom: '25px' }}>
-                                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-dim)' }}>{dur} HOUR ACCESS</div>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-dim)' }}>{dur === '0' ? 'LIFETIME' : `${dur} HOUR`} ACCESS</div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     {['eth', 'ltc', 'btc'].map(coin => (
                                                         <div key={coin}>
@@ -416,7 +675,7 @@ export default function AdminPage({ user }) {
                                         <div className="glass" style={{ padding: '30px' }}>
                                             <h3 style={{ marginBottom: '8px', fontWeight: '800' }}>Free Key Generator</h3>
                                             <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '25px' }}>
-                                                When ON, a "Generate Free Key" button appears on the login screen. Users can claim one free 24h key without paying.
+                                                When ON, a "Generate Free Key" button appears on the login screen. Free keys give limited access (45 predictions/day, no ESP).
                                             </p>
                                             <div
                                                 onClick={() => setSettings(prev => ({ ...prev, free_keygen_enabled: !prev.free_keygen_enabled }))}
@@ -433,24 +692,10 @@ export default function AdminPage({ user }) {
                                                         {settings.free_keygen_enabled ? '● ACTIVE' : '○ DISABLED'}
                                                     </div>
                                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                                                        {settings.free_keygen_enabled ? 'Users can generate free keys on login screen' : 'Login screen shows no free key option'}
+                                                        {settings.free_keygen_enabled ? 'Users can generate free keys (limited access)' : 'Login screen shows no free key option'}
                                                     </div>
                                                 </div>
-                                                {/* Toggle switch */}
-                                                <div style={{
-                                                    width: '50px', height: '26px', borderRadius: '13px',
-                                                    background: settings.free_keygen_enabled ? '#00ff9d' : 'rgba(255,255,255,0.1)',
-                                                    position: 'relative', transition: 'all 0.3s ease',
-                                                    boxShadow: settings.free_keygen_enabled ? '0 0 15px rgba(0,255,157,0.5)' : 'none'
-                                                }}>
-                                                    <div style={{
-                                                        position: 'absolute', top: '3px',
-                                                        left: settings.free_keygen_enabled ? '27px' : '3px',
-                                                        width: '20px', height: '20px', borderRadius: '50%',
-                                                        background: settings.free_keygen_enabled ? '#000' : 'rgba(255,255,255,0.5)',
-                                                        transition: 'all 0.3s ease'
-                                                    }} />
-                                                </div>
+                                                <ToggleSwitch active={!!settings.free_keygen_enabled} color="#00ff9d" />
                                             </div>
                                         </div>
 
@@ -460,6 +705,7 @@ export default function AdminPage({ user }) {
                             </motion.div>
                         )}
 
+                        {/* ===== ANNOUNCEMENTS TAB ===== */}
                         {activeTab === 'announcements' && !isKeyGenOnly && (
                             <motion.div key="announcements" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '25px' }}>
@@ -489,13 +735,54 @@ export default function AdminPage({ user }) {
                                                 </div>
                                             ))}
                                             {announcements.length === 0 && (
-                                                <div style={{ textAlign: 'center', py: '40px', opacity: 0.2 }}>
+                                                <div style={{ textAlign: 'center', padding: '40px', opacity: 0.2 }}>
                                                     <Mail size={40} />
-                                                    <p style={{ fontSize: '0.7rem', mt: '10px' }}>No past broadcasts</p>
+                                                    <p style={{ fontSize: '0.7rem', marginTop: '10px' }}>No past broadcasts</p>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ===== ESP SCRIPT TAB ===== */}
+                        {activeTab === 'esp' && !isKeyGenOnly && (
+                            <motion.div key="esp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                                <div className="glass" style={{ padding: '40px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                                        <div>
+                                            <h3 style={{ fontSize: '1.4rem', fontWeight: '900' }}>ESP Script Master</h3>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '5px' }}>Upload the latest ESP/Script for premium users to download from their dashboard.</p>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const script = document.getElementById('esp-editor').value;
+                                                setLoading(true);
+                                                try {
+                                                    await api.post('/api/admin/upload-esp', { script });
+                                                    setSettings(prev => ({ ...prev, esp_script: script }));
+                                                    alert('ESP Script Distributed Successfully');
+                                                } catch (err) {
+                                                    alert(err.response?.status === 413 ? 'Payload Too Large' : 'Upload Failed');
+                                                }
+                                                setLoading(false);
+                                            }}
+                                            className="btn-primary"
+                                            style={{ height: '50px', padding: '0 30px' }}
+                                            disabled={loading}
+                                        >
+                                            {loading ? 'DEPLOYING...' : 'SAVE & DEPLOY'}
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        id="esp-editor"
+                                        key={settings.esp_script ? 'loaded' : 'default'}
+                                        defaultValue={settings.esp_script || `// BloxPredict ESP Script\n// Update this content for all operators\n\nconsole.log("ESP Initialized");`}
+                                        className="input-field"
+                                        style={{ minHeight: '500px', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6', padding: '25px', resize: 'vertical' }}
+                                        placeholder="// Paste your javascript here..."
+                                    />
                                 </div>
                             </motion.div>
                         )}
@@ -508,6 +795,27 @@ export default function AdminPage({ user }) {
                 .glass-btn { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
                 .glass-btn:hover { background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
             `}</style>
+        </div>
+    );
+}
+
+// Toggle Switch Component
+function ToggleSwitch({ active, color }) {
+    return (
+        <div style={{
+            width: '50px', height: '26px', borderRadius: '13px',
+            background: active ? color : 'rgba(255,255,255,0.1)',
+            position: 'relative', transition: 'all 0.3s ease',
+            boxShadow: active ? `0 0 15px ${color}66` : 'none',
+            flexShrink: 0
+        }}>
+            <div style={{
+                position: 'absolute', top: '3px',
+                left: active ? '27px' : '3px',
+                width: '20px', height: '20px', borderRadius: '50%',
+                background: active ? '#000' : 'rgba(255,255,255,0.5)',
+                transition: 'all 0.3s ease'
+            }} />
         </div>
     );
 }
